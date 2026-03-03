@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>协会课表管理系统 - v19 节次全功能版</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <style>
+        :root { --blue: #1a73e8; --green: #2ecc71; --orange: #f39c12; --bg: #f4f7f6; --text: #2c3e50; --red: #ff4d4f; }
+        body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background: url('https://w.wallhaven.cc/full/1q/wallhaven-1q19l1.png') no-repeat center center fixed;
+    background-size: cover; margin: 0; display: flex; height: 100vh; color: var(--text); overflow: hidden; }
+        
+        input[type="text"], select {
+    border-radius: 20px;       /* 数值越大越圆，20px 左右就是胶囊状 */
+    padding: 10px 15px;         /* 增加内边距，让文字不挨着边 */
+    border: 1px solid #ddd;     /* 浅色边框 */
+    outline: none;              /* 去掉点击时的蓝色外框 */
+    transition: all 0.3s ease; /* 确保圆角变化时也有动画 */
+}
+    input[type="text"]:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 8px rgba(26, 115, 232, 0.2);
+    transform: translateY(-1px); /* 向上微动，配合你要求的动效 */
+}
+        
+        /* 丝滑动画引擎 */
+        * { transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-sizing: border-box; }
+
+        /* --- 侧边栏 --- */
+        .sidebar { 
+    width: 300px;
+    background: rgba(255, 255, 255, 0.8); 
+    backdrop-filter: blur(10px); 
+    border-right: 1px solid rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    z-index: 100;
+
+    /* --- 新增/修改以下三行，实现悬浮效果 --- */
+    margin: 20px 0 20px 20px; /* 上、右、下、左 的外边距。下方留出 20px，左侧也留出 20px */
+    height: calc(100vh - 40px); /* 减去上下各 20px 的边距，保证不超出屏幕 */
+    border-radius: 16px;       /* 给侧边栏整体加上圆角，更有悬浮感 */
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1); /* 增加阴影，强化“浮起来”的视觉效果 */
+}
+        .sidebar-header { padding: 20px; border-bottom: 2px solid var(--blue); flex-shrink: 0; }
+       .member-list {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden; /* 关键：禁止横向滚动，防止左右晃动 */
+    padding: 10px 15px; /* 增加左右内边距，让蓝色边框不挨着墙 */
+}
+        .member-item {
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    margin-right: 5px; /* 关键：在右侧留出 5px 空间，防止圆角撞上滚动条 */
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid transparent;
+    transition: all 0.2s; /* 让动画更干脆一点 */
+}
+.sidebar-footer { 
+    padding: 20px 15px; 
+    border-top: 1px solid rgba(0,0,0,0.05); /* 边框调淡，防止割裂感 */
+    background: rgba(255, 255, 255, 0.4);   /* 关键：从 white 改为 0.4 的半透明 */
+    backdrop-filter: blur(5px);             /* 增加一点模糊效果，显得更有质感 */
+    margin-top: auto; 
+    border-radius: 0 0 16px 16px; 
+}
+
+/* 同时建议微调一下重置按钮的背景，让它在透明底上更清晰 */
+.sidebar-footer .btn-outline {
+    background: rgba(255, 255, 255, 0.8) !important; /* 按钮本身保持较高不透明度 */
+    border: 1px solid rgba(255, 77, 79, 0.3);
+}
+        /* 保持原有的 hover */
+.member-item:hover { background: #f0f7ff; transform: translateX(8px); box-shadow: -5px 0 0 var(--blue); }
+
+/* 保持原有的 active */
+.member-item.active { background: #e8f0fe; color: var(--blue); font-weight: bold; border: 1px solid var(--blue); transform: scale(1.02); }
+
+/* 新增：解决你说的“不动”问题 */
+/* 当选中的项被鼠标悬停时，同时保留放大和位移 */
+.member-item.active:hover { 
+    transform: translateX(8px) scale(1.02); 
+    box-shadow: -5px 0 0 var(--blue), 0 5px 15px rgba(0,0,0,0.1); 
+}
+        /* --- 主界面 --- */
+        /* 修改对应 CSS 行为： */
+.main {
+    flex: 1; 
+    padding: 20px;       /* 适度的留白 */
+    overflow-x: hidden;  /* ！！！禁止横向溢出，这是解决右侧超出的关键 */
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    box-sizing: border-box; /* 确保 padding 不会撑大容器 */
+}
+        .card {
+    background: rgba(255, 255, 255, 0.8); /* 半透明白色 */
+    backdrop-filter: blur(5px); /* 轻微模糊 */
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1); /* 让阴影更深邃一点 */
+    border: 1px solid rgba(255,255,255,0.3); /* 增加边缘亮光 */
+}
+        
+        .file-zone { display: flex; gap: 20px; flex-wrap: wrap; }
+        .import-box { flex: 1; min-width: 240px; border: 2px dashed #ccc; padding: 30px; border-radius: 12px; text-align: center; cursor: pointer; }
+        .import-box:hover { border-color: var(--blue); background: #fcfdff; transform: translateY(-8px); box-shadow: 0 15px 30px rgba(26,115,232,0.1); }
+
+        /* 按钮组与排版 */
+        .btn-group { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+        .btn:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); filter: brightness(1.05); }
+        .btn:active { transform: scale(0.95); }
+        
+        .btn-blue { background: var(--blue); color: white; }
+        .btn-green { background: var(--green); color: white; }
+        .btn-outline { background: white; border: 1px solid #ddd; color: #666; }
+        .btn-red { background: #fff1f0; border: 1px solid #ffa39e; color: #cf1322; }
+        .btn-orange { background: var(--orange); color: white; width: 100%; font-size: 16px; margin-top: 10px; }
+
+        /* 搜索容器 */
+        .search-container { height: 0; overflow: hidden; opacity: 0; transform-origin: top; }
+        .search-container.open { height: 45px; opacity: 1; margin: 10px 0; }
+        .search-box { width: 100%; padding: 10px 15px; border-radius: 20px; border: 1px solid #ddd; outline: none; }
+
+        /* 课表格子编辑器 */
+        .grid { display: grid; gap: 8px; margin-top: 15px; }
+        .cell { padding: 15px; text-align: center; border: 1px solid #eee; border-radius: 8px; cursor: pointer; background: #fff; position: relative; min-height: 50px; display: flex; align-items: center; justify-content: center; }
+        .cell:not(.header):hover { border-color: var(--green); transform: scale(1.06); z-index: 10; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        .cell.selected { background: var(--green) !important; color: white !important; font-weight: bold; }
+        .cell.header { background: #f8f9fa; font-weight: bold; color: #666; cursor: default; }
+
+        /* 打印表格样式 */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
+        th, td { border: 1px solid #eee; padding: 12px; text-align: center; }
+
+        /* 开发者专属铭牌样式 */
+.dev-card {
+    margin-top: 20px;
+    padding: 15px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.1) !important; /* 极高透明度 */
+    backdrop-filter: blur(20px);
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dev-info h4 {
+    margin: 0;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.6);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+.dev-name {
+    font-size: 22px;
+    font-weight: 900;
+    /* 流光渐变文字效果 */
+    background: linear-gradient(90deg, #fff, var(--blue), #fff);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shine 4s linear infinite;
+}
+
+@keyframes shine {
+    to { background-position: 200% center; }
+}
+
+.dev-tag {
+    padding: 5px 12px;
+    background: rgba(26, 115, 232, 0.2);
+    border: 1px solid var(--blue);
+    color: var(--blue);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+    /* 系统总标题样式 */
+.system-title-box {
+    text-align: center;
+    padding: 60px 0;
+    margin-bottom: 20px;
+    animation: fadeInDown 1s ease-out; /* 增加进入动画 */
+}
+
+.system-title-box h1 {
+    margin: 0;
+    font-size: 36px;
+    font-weight: 800;
+    color: white;
+    letter-spacing: 8px; /* 增加字间距更显大气 */
+    text-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+.system-subtitle {
+    display: block;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: 8px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
+    /* 成员管理增强样式 */
+/* 复选框容器：默认隐藏 */
+.checkbox-wrapper {
+    width: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+}
+
+/* 当开启管理模式时 */
+.is-managing .checkbox-wrapper {
+    width: 30px; /* 复选框展开后的宽度 */
+    opacity: 1;
+}
+
+/* 调整成员项的间距 */
+.member-item-wrapper {
+    display: flex;
+    align-items: center;
+    padding-left: 5px;
+    overflow: hidden;
+}
+.mgmt-header { 
+    display: flex; justify-content: space-between; align-items: center; 
+    padding: 10px; background: rgba(255,255,255,0.1); border-radius: 8px; margin-bottom: 10px;
+}
+
+/* 批量删除按钮 */
+.btn-batch-delete { 
+    background: rgba(255, 77, 79, 0.2) !important; 
+    color: #ff4d4f !important; 
+    border: 1px solid rgba(255, 77, 79, 0.3) !important;
+    font-size: 12px; padding: 5px 10px;
+}
+.btn-batch-delete:hover { background: var(--red) !important; color: white !important; }
+
+/* 姓名编辑状态 */
+.editable-name { cursor: text; padding: 2px 5px; border-radius: 4px; }
+.editable-name:hover { background: rgba(26, 115, 232, 0.1); }
+
+    /* 隐藏最右侧主区域的滚动条 */
+/*.main::-webkit-scrollbar {
+    display: none; 
+}   */
+
+/* 让侧边栏滚动条变美观、半透明 */
+/* 让主区域滚动条重新出现，且样式与侧边栏统一 */
+.main::-webkit-scrollbar {
+    width: 10px; /* 宽度适中 */
+}
+
+.main::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3); /* 浅色透明滑块，不挡背景图 */
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+.main::-webkit-scrollbar-track {
+    background: transparent; /* 轨道完全透明 */
+}
+.member-list::-webkit-scrollbar {
+    width: 5px; /* 极细 */
+}
+.member-list::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1); /* 浅色半透明 */
+    border-radius: 10px;
+}
+
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div id="batchToolBar" style="display:none; flex-direction:column; gap:8px; margin-top:10px;" class="mgmt-header">
+        <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+            <label style="font-size:12px; cursor:pointer; color:white;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"> 全选本页</label>
+            <button class="btn btn-batch-delete" onclick="batchDelete()">确认删除选中</button>
+        </div>
+    </div>
+
+    <div class="sidebar-header">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; font-size:16px;">👥 名单汇总 (<span id="mCount">0</span>)</h3>
+            <div style="display:flex; gap:10px;">
+                <div style="cursor:pointer; font-size:16px;" onclick="toggleManageMode()" title="批量管理">⚙️</div>
+                <div style="cursor:pointer; font-size:18px; padding:5px;" onclick="toggleSearch()" id="sIcon">🔍</div>
+            </div>
+        </div>
+        <div id="searchWrapper" class="search-container">
+            <input type="text" id="searchInput" class="search-box" placeholder="输入姓名过滤..." oninput="filterMembers()">
+        </div>
+        <div style="display:flex; gap:8px; margin-top:12px;">
+            <input type="text" id="addName" placeholder="手动添加干事..." style="flex:1; padding:8px; border:1px solid #ddd; border-radius:6px;">
+            <button class="btn btn-blue" style="padding: 8px 15px;" onclick="addPerson()">+</button>
+        </div>
+    </div>
+    <div id="memberList" class="member-list"></div>
+    <div class="sidebar-footer">
+        <button class="btn btn-outline" style="width:100%; color:var(--red); border-color:#ffa39e;" onclick="resetDB()">💣 重置所有数据</button>
+    </div>
+</div>
+
+<div class="main">
+    
+    <div class="system-title-box">
+        <h1>自律会办公室排班系统</h1>
+        <span class="system-subtitle">Self-Discipline Committee Office Scheduling System</span>
+    </div>
+
+    <div class="card">
+        <h3>📂 数据库导入导出</h3>
+        <div class="file-zone">
+            <div class="import-box" onclick="document.getElementById('f1').click()">
+                <b>📁 导入空课表</b><br><small>自动解析单双周Sheet</small>
+                <input type="file" id="f1" multiple hidden onchange="importXlsx(this, 'main')">
+            </div>
+            <div class="import-box" onclick="document.getElementById('f2').click()">
+                <b>📅 导入上周表</b><br><small>用于自动避让</small>
+                <input type="file" id="f2" hidden onchange="importXlsx(this, 'last')">
+            </div>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-green" onclick="exportCombined()">📤 导出单文件(合表)</button>
+            <button class="btn btn-outline" onclick="exportCourse('odd')">导出单周表</button>
+            <button class="btn btn-outline" onclick="exportCourse('even')">导出双周表</button>
+            <span style="flex:1"></span>
+            <button class="btn btn-blue" onclick="addSlot()">➕ 增加一行节次</button>
+            <button class="btn btn-red" onclick="popSlot()">➖ 删除最后节次</button>
+        </div>
+    </div>
+
+    <div id="editor" class="card" style="display:none;">
+        <h3>✏️ 编辑课表：<span id="editTitle" style="color:var(--blue)"></span></h3>
+        <div class="btn-group" style="margin-bottom:15px;">
+            <button id="tOdd" class="btn btn-blue" onclick="switchWeek('odd')">单周</button>
+            <button id="tEven" class="btn btn-outline" onclick="switchWeek('even')">双周</button>
+        </div>
+        <div id="courseGrid" class="grid"></div>
+        <p style="color:#999; font-size:12px; margin-top:15px;">* 点击上方“增加/删除”按钮可动态调整节次行数</p>
+    </div>
+
+    <div class="card">
+        <h3>🚀 自动排班</h3>
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+            周期：<select id="wType" style="padding:10px; border-radius:6px; border:1px solid #ddd;"><option value="odd">单周</option><option value="even">双周</option></select>
+            排除名单：<input type="text" id="excludeBox" style="flex:1; min-width:250px; padding:10px;" placeholder="会自动读取导入的文件...">
+        </div>
+        <button class="btn btn-orange" onclick="doSchedule()">一键排班</button>
+    </div>
+
+    <div class="dev-card">
+    <div class="dev-info">
+        <h4>System Architect & Lead Developer</h4>
+        <div class="dev-name">亦尔</div>
+    </div>
+    <div class="dev-tag">CORE EDITION v20.0</div>
+</div>
+
+    <div id="resCard" class="card" style="display:none;"><div id="resTable" style="overflow-x:auto;"></div><button class="btn btn-blue" style="margin-top:15px;" onclick="window.print()">确认并打印排班结果</button></div>
+</div>
+
+<script>
+    const DAYS = ["周一", "周二", "周三", "周四", "周五"];
+    let slots = JSON.parse(localStorage.getItem('asso_slots_v19') || '["第一大节", "第二大节", "第三大节", "第四大节", "第五大节"]');
+    let db = JSON.parse(localStorage.getItem('asso_db_v19') || '{}'), curName = null, activeWeek = 'odd';
+    let isManaging = false; // 记录当前是否处于管理模式（提升到顶部，供所有函数读取）
+
+    function toggleSearch() { 
+        const w = document.getElementById('searchWrapper'); w.classList.toggle('open'); 
+        document.getElementById('sIcon').innerText = w.classList.contains('open') ? '🔼' : '🔍';
+        if(w.classList.contains('open')) document.getElementById('searchInput').focus(); 
+    }
+    
+    function filterMembers() { renderList(document.getElementById('searchInput').value.toLowerCase()); }
+
+    async function importXlsx(input, type) {
+        for (let file of input.files) {
+            const data = await file.arrayBuffer();
+            const wb = XLSX.read(data, {type: 'array'});
+            wb.SheetNames.forEach(sn => {
+                const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header: 1});
+                if (type === 'main') parseRows(rows, sn.includes("双") ? "even" : "odd");
+                else parseLast(rows);
+            });
+        }
+        alert("导入成功！");
+    }
+
+    function parseRows(rows, week) {
+        rows.forEach((row, rIdx) => {
+            if (rIdx < 1) return;
+            let slotName = row[0] || `第${rIdx}节`;
+            if(!slots.includes(slotName)) { slots.push(slotName); save(); }
+            for (let i = 1; i <= 5; i++) {
+                const names = String(row[i] || "").split(/[，,、\s\n]+/).filter(n => n.trim().length >= 2);
+                names.forEach(n => {
+                    n = n.trim(); if (!db[n]) db[n] = { odd: [], even: [], count: 0 };
+                    const tid = `${DAYS[i-1]}_${slotName}`;
+                    if (!db[n][week].includes(tid)) db[n][week].push(tid);
+                });
+            }
+        });
+        save(); renderList(); initGrid();
+    }
+
+    function parseLast(rows) {
+        const names = [...new Set(JSON.stringify(rows).match(/[\u4e00-\u9fa5]{2,4}/g) || [])].filter(n => !["大节","周","值班","干事"].some(b => n.includes(b)));
+        document.getElementById('excludeBox').value = names.join('，');
+    }
+
+    // 节次调整功能
+    function addSlot() { let n = prompt("输入新节次名称:", `第${slots.length+1}大节`); if(n) { slots.push(n); save(); initGrid(); if(curName) refreshUI(); } }
+    function popSlot() { if(confirm("确定删除最后一节吗？相关课表数据也会不可见。")) { slots.pop(); save(); initGrid(); if(curName) refreshUI(); } }
+
+    function exportCombined() {
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(buildMatrix('odd')), "单周汇总表");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(buildMatrix('even')), "双周汇总表");
+        XLSX.writeFile(wb, "协会课表全汇总.xlsx");
+    }
+
+    function exportCourse(w) {
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(buildMatrix(w)), "汇总");
+        XLSX.writeFile(wb, `汇总-${w}.xlsx`);
+    }
+
+    function buildMatrix(week) {
+        const m = [ ["", ...DAYS] ];
+        slots.forEach(s => {
+            const row = [s];
+            DAYS.forEach(d => row.push(Object.keys(db).filter(n => db[n][week].includes(`${d}_${s}`)).join('，')));
+            m.push(row);
+        });
+        return m;
+    }
+
+    function initGrid() {
+        const g = document.getElementById('courseGrid');
+        g.style.gridTemplateColumns = `120px repeat(5, 1fr)`;
+        g.innerHTML = '<div class="cell header">时段</div>' + DAYS.map(d => `<div class="cell header">${d}</div>`).join('');
+        slots.forEach(s => {
+            g.innerHTML += `<div class="cell header">${s}</div>`;
+            DAYS.forEach(d => g.innerHTML += `<div class="cell" id="c_${d}_${s}" onclick="toggleCell('${d}_${s}')"></div>`);
+        });
+    }
+
+    function toggleCell(tid) {
+        if (!curName) return;
+        let list = db[curName][activeWeek];
+        let i = list.indexOf(tid);
+        if (i > -1) list.splice(i, 1); else list.push(tid);
+        save(); refreshUI();
+    }
+
+    function refreshUI() { document.querySelectorAll('.cell:not(.header)').forEach(el => el.classList.toggle('selected', db[curName][activeWeek].includes(el.id.replace('c_', '')))); }
+
+    // 增强版：渲染名单（支持复选框和改名）
+    function renderList(query = "") {
+    const list = document.getElementById('memberList');
+    const keys = Object.keys(db).sort().filter(n => n.includes(query));
+    document.getElementById('mCount').innerText = Object.keys(db).length;
+    
+    // 根据管理模式保持/移除列表样式
+    if (isManaging) list.classList.add('is-managing'); else list.classList.remove('is-managing');
+
+    list.innerHTML = keys.map(n => `
+        <div class="member-item-wrapper">
+            <div class="checkbox-wrapper">
+                <input type="checkbox" class="member-checkbox" value="${n}">
+            </div>
+            <div class="member-item ${curName===n?'active':''}" style="flex:1;" onclick="select('${n}')">
+                <span class="editable-name" onclick="event.stopPropagation(); renamePerson('${n}')" title="点击改名">${n}</span>
+                <small>${db[n].count}次</small>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 批量删除后自动退出管理模式
+function batchDelete() {
+    const selected = Array.from(document.querySelectorAll('.member-checkbox:checked')).map(cb => cb.value);
+    if (selected.length === 0) {
+        alert("请先勾选要删除的干事");
+        return;
+    }
+    
+    if (confirm(`确定要永久删除这 ${selected.length} 个成员吗？`)) {
+        selected.forEach(name => delete db[name]);
+        if (selected.includes(curName)) {
+            curName = null;
+            document.getElementById('editor').style.display = 'none';
+        }
+        save();
+        toggleManageMode(); // 删除完成后自动退出管理模式并刷新列表
+        renderList();
+    }
+}
+
+
+
+    function select(n) { curName = n; document.getElementById('editTitle').innerText = n; document.getElementById('editor').style.display='block'; renderList(document.getElementById('searchInput').value); refreshUI(); }
+    
+    function switchWeek(w) {
+        activeWeek = w;
+        document.getElementById('tOdd').className = w==='odd'?'btn btn-blue':'btn btn-outline';
+        document.getElementById('tEven').className = w==='even'?'btn btn-blue':'btn btn-outline';
+        refreshUI();
+    }
+
+    // 功能：改名
+function renamePerson(oldName) {
+    let newName = prompt(`将 "${oldName}" 修改为:`, oldName);
+    if (newName && newName !== oldName) {
+        if (db[newName]) {
+            alert("该姓名已存在！");
+            return;
+        }
+        db[newName] = db[oldName]; // 复制数据
+        delete db[oldName];        // 删除旧数据
+        if (curName === oldName) curName = newName;
+        save();
+        renderList();
+        if (curName === newName) select(newName);
+    }
+}
+
+// 功能：全选/反选
+function toggleSelectAll() {
+    const isChecked = document.getElementById('selectAll').checked;
+    document.querySelectorAll('.member-checkbox').forEach(cb => cb.checked = isChecked);
+}
+
+
+
+    function doSchedule() {
+        const w = document.getElementById('wType').value, ex = document.getElementById('excludeBox').value.split(/[，,、\s\n]+/).filter(n=>n);
+        let used = new Set(), html = '<table><tr><th>时段</th>' + DAYS.map(d=>`<th>${d}</th>`).join('') + '</tr>';
+        slots.forEach(s => {
+            html += `<tr><td><b>${s}</b></td>`;
+            DAYS.forEach(d => {
+                let cans = Object.keys(db).filter(n => db[n][w].includes(`${d}_${s}`) && !ex.includes(n) && !used.has(n)).sort((a,b)=>db[a].count-db[b].count);
+                if(cans.length>0){ const c=cans[0]; html+=`<td>${c}</td>`; used.add(c); db[c].count++; }
+                else html+=`<td style="color:red">无人</td>`;
+            });
+            html += '</tr>';
+        });
+        document.getElementById('resTable').innerHTML = html + '</table>'; document.getElementById('resCard').style.display = 'block'; save(); renderList();
+    }
+
+    function addPerson() { let n = document.getElementById('addName').value.trim(); if(n && !db[n]) { db[n]={odd:[],even:[],count:0}; save(); renderList(); select(n); document.getElementById('addName').value=""; } }
+    function resetDB() { if(confirm("重置所有数据？")) { db={}; slots=["第一大节", "第二大节", "第三大节", "第四大节", "第五大节"]; save(); location.reload(); } }
+    function save() { localStorage.setItem('asso_db_v19', JSON.stringify(db)); localStorage.setItem('asso_slots_v19', JSON.stringify(slots)); }
+
+    initGrid(); renderList();
+
+function toggleManageMode() {
+    isManaging = !isManaging;
+    const list = document.getElementById('memberList');
+    const toolBar = document.getElementById('batchToolBar');
+    
+    if (isManaging) {
+        list.classList.add('is-managing');
+        toolBar.style.display = 'flex';
+    } else {
+        list.classList.remove('is-managing');
+        toolBar.style.display = 'none';
+        // 退出时取消所有选中
+        document.querySelectorAll('.member-checkbox').forEach(cb => cb.checked = false);
+        document.getElementById('selectAll').checked = false;
+    }
+}
+
+</script>
+</body>
+</html>
