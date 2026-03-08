@@ -1,4 +1,4 @@
-# 📅 自律会办公室排班系统 (Office Scheduling System)
+# 📅 排班系统 (Office Scheduling System)
 
 ![Version](https://img.shields.io/badge/version-2.1-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
