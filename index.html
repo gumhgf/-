@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>协会课表管理系统 - v21</title>
+    <title id="main-title">协会课表管理系统 - 加载中...</title>
     <script src="xlsx.full.min.js"></script>
     <style>
         :root { --blue: #1a73e8; --green: #2ecc71; --orange: #f39c12; --bg: #f4f7f6; --text: #2c3e50; --red: #ff4d4f; }
@@ -106,34 +106,71 @@
     transition: all 0.5s ease; /* 增加平滑过渡，让居中过程不突兀 */
 }
         .card {
-    background: rgba(255, 255, 255, 0.8); /* 半透明白色 */
-    backdrop-filter: blur(5px); /* 轻微模糊 */
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(5px);
     border-radius: 12px;
     padding: 25px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1); /* 让阴影更深邃一点 */
-    border: 1px solid rgba(255,255,255,0.3); /* 增加边缘亮光 */
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    border: 1px solid rgba(255,255,255,0.3);
     
-    /* --- 核心修改：确保两个卡片一样宽 --- */
-    width: 100%;            /* 初始尝试占满 */
-    max-width: 900px;       /* 设置一个最大宽度，防止在大屏幕上拉得太长导致变形 */
-    min-width: 600px;       /* 设置最小宽度，保证排版不拥挤 */
+    /* 调整尺寸以免收起侧边栏时过窄 */
+    width: 95%;
+    max-width: 1100px;     /* 稍微放大一点，更接近 v20 的大气感 */
+    min-width: 650px;
+    margin: 0 auto;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
         
         .file-zone { display: flex; gap: 20px; flex-wrap: wrap; }
         .import-box { flex: 1; min-width: 240px; border: 2px dashed #ccc; padding: 30px; border-radius: 12px; text-align: center; cursor: pointer; }
         .import-box:hover { border-color: var(--blue); background: #fcfdff; transform: translateY(-8px); box-shadow: 0 15px 30px rgba(26,115,232,0.1); }
+        /* 拖拽高亮 */
+        .import-box.drag-over { border-color: var(--blue); background: #e8f0fe; }
 
         /* 按钮组与排版 */
         .btn-group { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
-        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
-        .btn:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); filter: brightness(1.05); }
-        .btn:active { transform: scale(0.95); }
-        
-        .btn-blue { background: var(--blue); color: white; }
-        .btn-green { background: var(--green); color: white; }
-        .btn-outline { background: white; border: 1px solid #ddd; color: #666; }
-        .btn-red { background: #fff1f0; border: 1px solid #ffa39e; color: #cf1322; }
-        .btn-orange { background: var(--orange); color: white; width: 100%; font-size: 16px; margin-top: 10px; }
+
+        /* 全局按钮美化 */
+        button {
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;       /* 胶囊形状 */
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* 丝滑过渡 */
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;                  /* 图标和文字的间距 */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(5px); /* 按钮也带一点模糊感 */
+        }
+
+        /* 蓝色按钮（如：导出、管理） */
+        button { background: var(--blue); }
+
+        /* 橙色按钮（如：一键排班） */
+        button[onclick*="autoSchedule"] { background: linear-gradient(135deg, #f39c12, #e67e22); }
+
+        /* 绿色按钮（如：导出表格） */
+        button[onclick*="export"] { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+
+        /* 红色按钮（如：重置） */
+        .danger-btn, button[onclick*="reset"] { background: linear-gradient(135deg, #ff4d4f, #ff7875); }
+
+        /* 鼠标悬停动效：变亮并往上弹一点 */
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+            filter: brightness(1.1);
+        }
+
+        /* 点击时的反馈 */
+        button:active {
+            transform: translateY(0);
+            filter: brightness(0.9);
+        }
 
         /* 搜索容器 */
         .search-container { height: 0; overflow: hidden; opacity: 0; transform-origin: top; }
@@ -309,10 +346,9 @@
 
 /* 2. 定义收起状态：向左偏移自身宽度，但留出一丁点边缘或完全隐藏 */
 .sidebar.collapsed {
-    /* 300px宽度 + 20px边距 = 320px */
-    transform: translateX(-320px) !important; 
-    /* 关键：使用 margin-right 而不是 margin-left，能更平稳地把右侧内容“吸”过来 */
-    margin-right: -300px !important;
+    transform: translateX(-310px) !important; /* 向左滑出屏幕，只留10px边缘 */
+    margin-left: -300px !important;            /* 关键：同步交还空间，让右侧居中 */
+    margin-right: 0 !important;                /* 清除之前的错误干扰 */
 }
 
 /* 3. 悬浮切换按钮样式 */
@@ -340,7 +376,7 @@
 
     /* 关键修改：初始透明 */
     opacity: 0; 
-    transition: all 0.3s ease; /* 增加平滑过渡 */
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important; /* 必须跟 sidebar 频率一致 */
 }
 
 /* 2. 悬停触发：当鼠标悬停在侧边栏整体或按钮区域时显现 */
@@ -367,7 +403,13 @@
     width: 40px;
     height: 100%;
 }
-
+/* 拖拽悬停时的样式 */
+.import-box.drag-over {
+    border-color: var(--green);
+    background: rgba(46, 204, 113, 0.1);
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(46, 204, 113, 0.2);
+}
     </style>
 </head>
 <body>
@@ -415,12 +457,12 @@
     <div class="card">
         <h3>📂 数据库导入导出</h3>
         <div class="file-zone">
-            <div class="import-box" onclick="document.getElementById('f1').click()">
-                <b>📁 导入空课表</b><br><small>自动解析单双周Sheet</small>
+            <div class="import-box" id="drop-zone-main" onclick="document.getElementById('f1').click()">
+                <b>📁 导入空课表</b><br><small>支持点击或拖拽文件至此</small>
                 <input type="file" id="f1" multiple hidden onchange="importXlsx(this, 'main')">
             </div>
-            <div class="import-box" onclick="document.getElementById('f2').click()">
-                <b>📅 导入上周表</b><br><small>用于自动避让</small>
+            <div class="import-box" id="drop-zone-last" onclick="document.getElementById('f2').click()">
+                <b>📅 导入上周表</b><br><small>支持点击或拖拽文件至此</small>
                 <input type="file" id="f2" hidden onchange="importXlsx(this, 'last')">
             </div>
         </div>
@@ -446,22 +488,31 @@
 
     <div class="card">
         <h3>🚀 自动排班</h3>
-        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
-            周期：<select id="wType" style="padding:10px; border-radius:6px; border:1px solid #ddd;"><option value="odd">单周</option><option value="even">双周</option></select>
-            排除名单：<input type="text" id="excludeBox" style="flex:1; min-width:250px; padding:10px;" placeholder="会自动读取导入的文件...">
+        <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center;">
+            <select id="wType" style="flex:1">
+                <option value="odd">当前排班：单周</option>
+                <option value="even">当前排班：双周</option>
+            </select>
+            <input type="text" id="excludeBox" placeholder="避让名单(用逗号隔开)" style="flex:2">
         </div>
-        <button class="btn btn-orange" onclick="doSchedule()">一键排班</button>
+        
+        <div style="display:flex; gap:12px;">
+            <button class="btn btn-orange" style="flex:1" onclick="doSchedule()">🚀 一键智能排班</button>
+        </div>
     </div>
-
+    <div id="resCard" class="card" style="display:none;">
+        <h3>📅 排班预览</h3>
+        <div id="resTable" style="overflow-x:auto;"></div>
+        <button class="btn btn-blue" style="margin-top:15px;" onclick="window.print()">确认并打印排班结果</button>
+        <button class="btn btn-green" style="flex:1" onclick="exportSchedule()">📊 导出 Excel 表格</button>
+    </div>
     <div class="dev-card">
     <div class="dev-info">
         <h4>System Architect & Lead Developer</h4>
         <div class="dev-name">亦尔</div>
     </div>
-    <div class="dev-tag">CORE EDITION v21.0</div>
-</div>
+    <div class="dev-tag" id="version-display">VERSION LOADING...</div>
 
-    <div id="resCard" class="card" style="display:none;"><div id="resTable" style="overflow-x:auto;"></div><button class="btn btn-blue" style="margin-top:15px;" onclick="window.print()">确认并打印排班结果</button></div>
 </div>
 
 <script>
@@ -490,6 +541,48 @@
         }
         alert("导入成功！");
     }
+
+// 【第一步】定义全局版本号，以后只改这里！
+const APP_VER = "v21.2.0";
+
+// 【第二步】初始化函数：统一更新 UI 上的版本
+function syncVersion() {
+    document.getElementById('main-title').innerText = `协会课表管理系统 - ${APP_VER}`;
+    document.getElementById('version-display').innerText = `CORE EDITION ${APP_VER}`;
+    console.log(`System Initialized: ${APP_VER}`);
+}
+
+// 【第三步】拖拽功能初始化
+function initDragSupport() {
+    const setupZone = (id, type) => {
+        const zone = document.getElementById(id);
+        if (!zone) return;
+        
+        // 阻止默认行为
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => {
+            zone.addEventListener(e, (evt) => { evt.preventDefault(); evt.stopPropagation(); });
+        });
+
+        // 悬停效应
+        zone.addEventListener('dragover', () => zone.classList.add('drag-over'));
+        zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+
+        // 放置处理
+        zone.addEventListener('drop', (e) => {
+            zone.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                importXlsx({ files: files }, type); // 复用你原有的导入函数
+            }
+        });
+    };
+
+    setupZone('drop-zone-main', 'main');
+    setupZone('drop-zone-last', 'last');
+}
+
+
+
 
     function parseRows(rows, week) {
         rows.forEach((row, rIdx) => {
@@ -610,6 +703,8 @@ function batchDelete() {
         activeWeek = w;
         document.getElementById('tOdd').className = w==='odd'?'btn btn-blue':'btn btn-outline';
         document.getElementById('tEven').className = w==='even'?'btn btn-blue':'btn btn-outline';
+        const note = document.getElementById('weekNote');
+        if (note) note.innerText = `当前：${w==='odd'?'单周':'双周'}`;
         refreshUI();
     }
 
@@ -639,25 +734,58 @@ function toggleSelectAll() {
 
 
     function doSchedule() {
-        const w = document.getElementById('wType').value, ex = document.getElementById('excludeBox').value.split(/[，,、\s\n]+/).filter(n=>n);
-        let used = new Set(), html = '<table><tr><th>时段</th>' + DAYS.map(d=>`<th>${d}</th>`).join('') + '</tr>';
+        const w = document.getElementById('wType').value;
+        const ex = document.getElementById('excludeBox').value.split(/[，,、\s\n]+/).filter(n=>n);
+        
+        let used = new Set();
+        let html = '<table><tr><th>时段</th>' + DAYS.map(d=>`<th>${d}</th>`).join('') + '</tr>';
+        
         slots.forEach(s => {
             html += `<tr><td><b>${s}</b></td>`;
             DAYS.forEach(d => {
-                let cans = Object.keys(db).filter(n => db[n][w].includes(`${d}_${s}`) && !ex.includes(n) && !used.has(n)).sort((a,b)=>db[a].count-db[b].count);
-                if(cans.length>0){ const c=cans[0]; html+=`<td>${c}</td>`; used.add(c); db[c].count++; }
-                else html+=`<td style="color:red">无人</td>`;
+                let cans = Object.keys(db).filter(n => 
+                    db[n][w].includes(`${d}_${s}`) && 
+                    !ex.includes(n) && 
+                    !used.has(n)
+                ).sort((a,b) => db[a].count - db[b].count);
+                
+                if(cans.length > 0){ 
+                    const c = cans[0]; 
+                    html += `<td>${c}</td>`; 
+                    used.add(c); 
+                    db[c].count++; 
+                } else {
+                    html += `<td style="color:red">无人</td>`;
+                }
             });
             html += '</tr>';
         });
-        document.getElementById('resTable').innerHTML = html + '</table>'; document.getElementById('resCard').style.display = 'block'; save(); renderList();
+        
+        document.getElementById('resTable').innerHTML = html + '</table>';
+        const resCard = document.getElementById('resCard');
+        resCard.style.display = 'block';
+        
+        // 关键：自动滚动到结果表格，且避开钭牌遫挡
+resCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        save();
+        renderList();
     }
 
     function addPerson() { let n = document.getElementById('addName').value.trim(); if(n && !db[n]) { db[n]={odd:[],even:[],count:0}; save(); renderList(); select(n); document.getElementById('addName').value=""; } }
     function resetDB() { if(confirm("重置所有数据？")) { db={}; slots=["第一大节", "第二大节", "第三大节", "第四大节", "第五大节"]; save(); location.reload(); } }
     function save() { localStorage.setItem('asso_db_v19', JSON.stringify(db)); localStorage.setItem('asso_slots_v19', JSON.stringify(slots)); }
 
-    initGrid(); renderList();
+    initGrid(); 
+    renderList();
+
+// 最后，在页面加载时启动所有逻辑
+window.addEventListener('DOMContentLoaded', () => {
+    syncVersion();
+    initDragSupport();
+    initGrid(); 
+    renderList();
+});
 
 function toggleManageMode() {
     isManaging = !isManaging;
@@ -689,7 +817,17 @@ function toggleSidebar() {
         icon.innerText = '◀'; // 展开时指向左
     }
 }
-
+function exportSchedule() {
+        const table = document.querySelector('#resTable table');
+        if (!table) return alert("请先生成排班！");
+        
+        const ws = XLSX.utils.table_to_sheet(table);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "值班表");
+        
+        // 文件名自动带上版本号
+        XLSX.writeFile(wb, `自律会排班表_${APP_VER}_${new Date().toLocaleDateString()}.xlsx`);
+    }
 </script>
 </body>
 </html>
