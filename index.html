@@ -344,23 +344,24 @@
     transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* 2. 定义收起状态：向左偏移自身宽度，但留出一丁点边缘或完全隐藏 */
+/* 1. 修改收起状态：不再位移 310px，而是位移侧边栏自身的宽度 */
 .sidebar.collapsed {
-    transform: translateX(-310px) !important; /* 向左滑出屏幕，只留10px边缘 */
-    margin-left: -300px !important;            /* 关键：同步交还空间，让右侧居中 */
-    margin-right: 0 !important;                /* 清除之前的错误干扰 */
+    transform: translateX(-100%) !important; /* 100% 代表向左位移它自己的宽度(300px) */
+    margin-left: 0 !important;                /* 保持原位，仅靠位移隐藏 */
+    margin-right: -300px !important;           /* 关键：将原本占据的 300px 空间归还给主界面 */
 }
 
 /* 3. 悬浮切换按钮样式 */
 /* 1. 默认状态：完全透明 */
+/* 2. 优化切换按钮：确保它在侧边栏收起时依然可见 */
 .sidebar-toggle {
     position: absolute;
-    right: -25px;
+    right: -25px; /* 按钮宽度是 25px */
     top: 50%;
     transform: translateY(-50%);
     width: 25px;
     height: 60px;
-    background: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(0,0,0,0.1);
     border-left: none;
@@ -372,11 +373,11 @@
     z-index: 101;
     color: var(--blue);
     font-weight: bold;
-    box-shadow: 4px 0 10px rgba(0,0,0,0.05);
-
-    /* 关键修改：初始透明 */
-    opacity: 0; 
-    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important; /* 必须跟 sidebar 频率一致 */
+    box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+    
+    /* 关键：默认稍微显现一点，或者根据你的 hover 逻辑 */
+    opacity: 0.2; 
+    transition: all 0.3s ease !important;
 }
 
 /* 2. 悬停触发：当鼠标悬停在侧边栏整体或按钮区域时显现 */
@@ -387,7 +388,8 @@
 
 /* 3. 额外细节：收起状态下，按钮应该一直微弱可见，方便找回 */
 .sidebar.collapsed .sidebar-toggle {
-    opacity: 0.6; /* 收起后半透明显示，方便点击展开 */
+    opacity: 1; /* 收起后按钮必须高亮，否则用户找不到 */
+    right: -25px; /* 确保它贴在侧边栏右边缘，即屏幕左边缘 */
 }
 
 .sidebar.collapsed .sidebar-toggle:hover {
@@ -398,10 +400,11 @@
 .sidebar::after {
     content: "";
     position: absolute;
-    right: -40px; /* 向外延伸 40 像素的感应区 */
+    right: -40px; 
     top: 0;
     width: 40px;
     height: 100%;
+    pointer-events: none; /* 默认不阻碍点击 */
 }
 /* 拖拽悬停时的样式 */
 .import-box.drag-over {
@@ -409,6 +412,9 @@
     background: rgba(46, 204, 113, 0.1);
     transform: scale(1.02);
     box-shadow: 0 0 20px rgba(46, 204, 113, 0.2);
+}
+.sidebar.collapsed::after {
+    pointer-events: auto; /* 收起时启用感应区 */
 }
     </style>
 </head>
@@ -810,11 +816,10 @@ function toggleSidebar() {
     
     sidebar.classList.toggle('collapsed');
     
-    // 根据状态更换箭头方向
     if (sidebar.classList.contains('collapsed')) {
-        icon.innerText = '▶'; // 收起时指向右
+        icon.innerText = '▶'; 
     } else {
-        icon.innerText = '◀'; // 展开时指向左
+        icon.innerText = '◀'; 
     }
 }
 function exportSchedule() {
